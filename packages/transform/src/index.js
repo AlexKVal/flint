@@ -160,17 +160,27 @@ export default function ({ Plugin, types: t }) {
       return { statics, dynamics }
     }
 
-    function joinTags(tags) {
-      if (!tags.length) return '$' // view style
-      return tags.map(tag => tag.name)
+    function viewStyleLiteral(tag, stat) {
+      return t.identifier(`__.$${stat ? '._static' : ''}["${tag}"]`)
+    }
+
+    function assignment(left, right) {
+      return t.expressionStatement(t.assignmentExpression('=', left, right))
+    }
+
+    function joinTags(tags, value, isStatic) {
+      let result = value
+
+      tags.forEach(tag => {
+        result = assignment(viewStyleLiteral(tag.name, isStatic), result)
+      })
+
+      return result
     }
 
     // view.$._static["tags"] = ...
     function staticStyleStatement(tags, statics) {
-      return t.expressionStatement(t.assignmentExpression('=',
-        t.identifier(`__.$._static["${joinTags(tags)}"]`),
-        statics
-      ))
+      return joinTags(tags, statics, true)
     }
 
     // view.$["tags"] = ...
@@ -179,13 +189,7 @@ export default function ({ Plugin, types: t }) {
     }
 
     function styleAssign(tags, argument) {
-      return styleFlintAssignment(tags, styleFunction(argument))
-
-      // view.$.h1 = ...
-      function styleFlintAssignment(tags, right) {
-        const ident = `__.$["${joinTags(tags)}"]`
-        return t.assignmentExpression('=', t.identifier(ident), right)
-      }
+      return joinTags(tags, styleFunction(argument))
 
       // (_index) => {}
       function styleFunction(argument) {
