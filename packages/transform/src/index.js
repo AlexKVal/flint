@@ -161,10 +161,11 @@ export default function ({ Plugin, types: t }) {
     }
 
     function joinTags(tags) {
+      if (!tags.length) return '$' // view style
       return tags.map(tag => tag.name)
     }
 
-    // view.styles._static["tags"] = ...
+    // view.$._static["tags"] = ...
     function staticStyleStatement(tags, statics) {
       return t.expressionStatement(t.assignmentExpression('=',
         t.identifier(`__.$._static["${joinTags(tags)}"]`),
@@ -172,7 +173,7 @@ export default function ({ Plugin, types: t }) {
       ))
     }
 
-    // view.styles["tags"] = ...
+    // view.$["tags"] = ...
     function dynamicStyleStatement(tags, dynamics) {
       return t.expressionStatement(styleAssign(tags, dynamics))
     }
@@ -180,7 +181,7 @@ export default function ({ Plugin, types: t }) {
     function styleAssign(tags, argument) {
       return styleFlintAssignment(tags, styleFunction(argument))
 
-      // view.styles.$h1 = ...
+      // view.$.h1 = ...
       function styleFlintAssignment(tags, right) {
         const ident = `__.$["${joinTags(tags)}"]`
         return t.assignmentExpression('=', t.identifier(ident), right)
@@ -218,7 +219,6 @@ export default function ({ Plugin, types: t }) {
           // if (scope.hasOwnBinding('__')) {
           //   throw new Error('Must define $ expressions in view')
           // }
-
           return style(node)
         }
       },

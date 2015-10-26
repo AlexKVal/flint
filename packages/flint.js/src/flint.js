@@ -272,7 +272,7 @@ export default function run(browserNode, userOpts, afterRenderCb) {
 
           let u = void 0
           this.firstRender = true
-          this.styles = { _static: {} }
+          this.$ = { _static: {} }
           this.events = { mount: u, unmount: u, update: u, props: u }
 
           const viewOn = (scope, name, cb) => {
@@ -410,8 +410,8 @@ export default function run(browserNode, userOpts, afterRenderCb) {
               style: Object.assign(
                 {},
                 this.props.style,
-                this.styles.$ && this.styles.$(),
-                this.styles._static && this.styles._static.$
+                this.$.$ && this.$.$(),
+                this.$._static && this.$._static.$
               )
             },
             ...tags

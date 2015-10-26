@@ -42,23 +42,23 @@ export default function elementStyles(key, view, name, tag, props) {
     view.name && view.name.toLowerCase() == name
   )
 
-  if (view.styles) {
+  if (view.$) {
     const index = props.repeat ? key[1] : void 0
 
     // if <foobar> is root, then apply both the base ($) and ($foobar)
     const diffName = name !== tag
     const hasTag = typeof tag == 'string'
-    const tagStyle = hasTag && view.styles[prefix + tag]
+    const tagStyle = hasTag && view.$[tag]
 
-    const viewStyle = view.styles[prefix] && view.styles[prefix](index)
-    const viewStyleStatic = view.styles._static[prefix]
-    const nameStyle = view.styles[prefix + name]
+    const viewStyle = view.$[prefix] && view.$[prefix](index)
+    const viewStyleStatic = view.$._static[prefix]
+    const nameStyle = view.$[name]
 
     let nameStyleStatic
-    const tagStyleStatic = view.styles._static[prefix + tag]
+    const tagStyleStatic = view.$._static[tag]
 
     if (diffName)
-      nameStyleStatic = view.styles._static[prefix + name]
+      nameStyleStatic = view.$._static[name]
 
     let result
     let ran = false
@@ -86,17 +86,17 @@ export default function elementStyles(key, view, name, tag, props) {
     // add class styles
     if (props.className) {
       props.className.split(' ').forEach(className => {
-        const classSelector = `_class_${className}`
-        const justClass = prefix + classSelector
-        const nameAndClass = prefix + name + classSelector
+        const classSelector = `.${className}`
+        const justClass = classSelector
+        const nameAndClass = name + classSelector
 
         // $.class = {}
-        if (view.styles[justClass] || view.styles._static[justClass])
-          result = mergeStyles(result, view.styles[justClass] && view.styles[justClass](index), view.styles._static[justClass])
+        if (view.$[justClass] || view.$._static[justClass])
+          result = mergeStyles(result, view.$[justClass] && view.$[justClass](index), view.$._static[justClass])
 
         // $name.class = {}
-        if (view.styles[nameAndClass] || view.styles._static[nameAndClass])
-          result = mergeStyles(result, view.styles[nameAndClass] && view.styles[nameAndClass](index), view.styles._static[nameAndClass])
+        if (view.$[nameAndClass] || view.$._static[nameAndClass])
+          result = mergeStyles(result, view.$[nameAndClass] && view.$[nameAndClass](index), view.$._static[nameAndClass])
       })
     }
 
@@ -110,11 +110,6 @@ export default function elementStyles(key, view, name, tag, props) {
       // add style="" prop styles
       if (props.style)
         result = mergeStyles(result, props.style)
-
-      // apply view internal $ styles
-      if (name.indexOf('Flint.') == 0) {
-        result = mergeStyles(result, )
-      }
 
       // add view external props.style
       if (isRoot && view.props.style)
