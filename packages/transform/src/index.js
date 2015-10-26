@@ -100,10 +100,10 @@ export default function ({ Plugin, types: t }) {
   let keyBase = {}
 
   function style(node) {
-    return extractAndAssign(node.name.name, node.argument)
+    return extractAndAssign(node.tags, node.argument)
 
     // splits styles into static/dynamic pieces
-    function extractAndAssign(name, argument) {
+    function extractAndAssign(tags, argument) {
       // if array of objects
       if (t.isArrayExpression(argument)) {
         let staticProps = []
@@ -117,8 +117,8 @@ export default function ({ Plugin, types: t }) {
         }).filter(x => x !== null)
 
         return [
-          staticStyleStatement(name, t.objectExpression(staticProps)),
-          dynamicStyleStatement(name, argument)
+          staticStyleStatement(tags, t.objectExpression(staticProps)),
+          dynamicStyleStatement(tags, argument)
         ]
       }
       // if just object
@@ -126,22 +126,22 @@ export default function ({ Plugin, types: t }) {
         let { statics, dynamics } = extractStatics(argument)
 
         if (statics.length) {
-          const staticStatement = staticStyleStatement(name, t.objectExpression(statics))
+          const staticStatement = staticStyleStatement(tags, t.objectExpression(statics))
 
           if (dynamics.length)
             return [
               staticStatement,
-              dynamicStyleStatement(name, t.objectExpression(dynamics))
+              dynamicStyleStatement(tags, t.objectExpression(dynamics))
             ]
           else
             return staticStatement
         }
         else
-          return styleAssign(name, t.objectExpression(dynamics))
+          return styleAssign(tags, t.objectExpression(dynamics))
       }
 
       else {
-        return styleAssign(name)
+        return styleAssign(tags)
       }
     }
 
@@ -160,25 +160,29 @@ export default function ({ Plugin, types: t }) {
       return { statics, dynamics }
     }
 
-    // view.styles._static["name"] = ...
-    function staticStyleStatement(name, statics) {
+    function joinTags(tags) {
+      return tags.map(tag => tag.name)
+    }
+
+    // view.styles._static["tags"] = ...
+    function staticStyleStatement(tags, statics) {
       return t.expressionStatement(t.assignmentExpression('=',
-        t.identifier(`__.$._static["${name}"]`),
+        t.identifier(`__.$._static["${joinTags(tags)}"]`),
         statics
       ))
     }
 
-    // view.styles["name"] = ...
-    function dynamicStyleStatement(name, dynamics) {
-      return t.expressionStatement(styleAssign(name, dynamics))
+    // view.styles["tags"] = ...
+    function dynamicStyleStatement(tags, dynamics) {
+      return t.expressionStatement(styleAssign(tags, dynamics))
     }
 
-    function styleAssign(name, argument) {
-      return styleFlintAssignment(name, styleFunction(argument))
+    function styleAssign(tags, argument) {
+      return styleFlintAssignment(tags, styleFunction(argument))
 
       // view.styles.$h1 = ...
-      function styleFlintAssignment(name, right) {
-        const ident = `__.$["${name}"]`
+      function styleFlintAssignment(tags, right) {
+        const ident = `__.$["${joinTags(tags)}"]`
         return t.assignmentExpression('=', t.identifier(ident), right)
       }
 
@@ -215,10 +219,7 @@ export default function ({ Plugin, types: t }) {
           //   throw new Error('Must define $ expressions in view')
           // }
 
-          let result = style(node)
-          node.flintIsStyle = true
-          console.log(node)
-          return result
+          return style(node)
         }
       },
 
