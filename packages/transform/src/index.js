@@ -99,6 +99,98 @@ export default function ({ Plugin, types: t }) {
 
   let keyBase = {}
 
+  function style(node) {
+    return extractAndAssign(node.name.name, node.argument)
+
+    // splits styles into static/dynamic pieces
+    function extractAndAssign(name, argument) {
+      // if array of objects
+      if (t.isArrayExpression(argument)) {
+        let staticProps = []
+
+        argument.elements = argument.elements.map(el => {
+          if (!t.isObjectExpression(el)) return el
+          let { statics, dynamics } = extractStatics(el)
+          if (statics.length) staticProps = staticProps.concat(statics)
+          if (dynamics.length) return t.objectExpression(dynamics)
+          else return null
+        }).filter(x => x !== null)
+
+        return [
+          staticStyleStatement(name, t.objectExpression(staticProps)),
+          dynamicStyleStatement(name, argument)
+        ]
+      }
+      // if just object
+      else if (t.isObjectExpression(argument)) {
+        let { statics, dynamics } = extractStatics(argument)
+
+        if (statics.length) {
+          const staticStatement = staticStyleStatement(name, t.objectExpression(statics))
+
+          if (dynamics.length)
+            return [
+              staticStatement,
+              dynamicStyleStatement(name, t.objectExpression(dynamics))
+            ]
+          else
+            return staticStatement
+        }
+        else
+          return styleAssign(name, t.objectExpression(dynamics))
+      }
+
+      else {
+        return styleAssign(name)
+      }
+    }
+
+    // find statics/dynamics in object
+    function extractStatics(node) {
+      let statics = []
+      let dynamics = []
+
+      for (let prop of node.properties) {
+        if (t.isLiteral(prop.value) && t.isIdentifier(prop.key))
+          statics.push(prop)
+        else
+          dynamics.push(prop)
+      }
+
+      return { statics, dynamics }
+    }
+
+    // view.styles._static["name"] = ...
+    function staticStyleStatement(name, statics) {
+      return t.expressionStatement(t.assignmentExpression('=',
+        t.identifier(`__.$._static["${name}"]`),
+        statics
+      ))
+    }
+
+    // view.styles["name"] = ...
+    function dynamicStyleStatement(name, dynamics) {
+      return t.expressionStatement(styleAssign(name, dynamics))
+    }
+
+    function styleAssign(name, argument) {
+      return styleFlintAssignment(name, styleFunction(argument))
+
+      // view.styles.$h1 = ...
+      function styleFlintAssignment(name, right) {
+        const ident = `__.$["${name}"]`
+        return t.assignmentExpression('=', t.identifier(ident), right)
+      }
+
+      // (_index) => {}
+      function styleFunction(argument) {
+        return t.functionExpression(null, [t.identifier('_index')],
+          t.blockStatement([ t.returnStatement(argument) ])
+        )
+      }
+    }
+  }
+
   return new Plugin("flint-transform", {
     visitor: {
       ViewStatement(node) {
@@ -113,14 +205,21 @@ export default function ({ Plugin, types: t }) {
         )
       },
 
-      TagExpression(node, parent, scope) {
-        let caller = 'Flint.tag'
+      StyleStatement(node, parent, scope) {
+        return t.callExpression(t.identifier('Flint.style'), [t.literal('style'), node.block])
+      },
 
-        if (scope.hasOwnBinding('__')) {
-          caller = 'this.tag'
+      $Expression: {
+        enter(node, parent, scope) {
+          // if (scope.hasOwnBinding('__')) {
+          //   throw new Error('Must define $ expressions in view')
+          // }
+
+          let result = style(node)
+          node.flintIsStyle = true
+          console.log(node)
+          return result
         }
-
-        return t.callExpression(t.identifier(caller), [t.literal(node.name.name), node.argument])
       },
 
       JSXElement: {
@@ -264,136 +363,12 @@ export default function ({ Plugin, types: t }) {
 
       AssignmentExpression: {
         exit(node, parent, scope) {
+          const isStyle = node.left.name && node.left.name.indexOf('__.$') == 0
 
-          // styles
-
-          const isStyle = node.left && node.left.name && node.left.name.indexOf('$') == 0
-
-          // styles
-          if (isStyle)
-            return extractAndAssign(node)
-
-          // splits styles into static/dynamic pieces
-          function extractAndAssign(node) {
-            // if array of objects
-            if (t.isArrayExpression(node.right)) {
-              let staticProps = []
-
-              node.right.elements = node.right.elements.map(el => {
-                if (!t.isObjectExpression(el)) return el
-                let { statics, dynamics } = extractStatics(el)
-                if (statics.length) staticProps = staticProps.concat(statics)
-                if (dynamics.length) return t.objectExpression(dynamics)
-                else return null
-              }).filter(x => x !== null)
-
-              return [
-                staticStyleStatement(node, t.objectExpression(staticProps)),
-                dynamicStyleStatement(node, node.right)
-              ]
-            }
-
-            // if just object
-            else if (t.isObjectExpression(node.right)) {
-              let { statics, dynamics } = extractStatics(node.right)
-
-              if (statics.length) {
-                const staticStatement = staticStyleStatement(node, t.objectExpression(statics))
-
-                if (dynamics.length)
-                  return [
-                    staticStatement,
-                    dynamicStyleStatement(node, t.objectExpression(dynamics))
-                  ]
-                else
-                  return staticStatement
-              }
-              else {
-                return styleAssign(node, t.objectExpression(dynamics))
-              }
-            }
-
-            else {
-              return styleAssign(node)
-            }
-          }
-
-          // find statics/dynamics in object
-          function extractStatics(node) {
-            let statics = []
-            let dynamics = []
-
-            for (let prop of node.properties) {
-              if (t.isLiteral(prop.value) && t.isIdentifier(prop.key))
-                statics.push(prop)
-              else
-                dynamics.push(prop)
-            }
-
-            return { statics, dynamics }
-          }
-
-          // view.styles._static["name"] = ...
-          function staticStyleStatement(node, statics) {
-            return viewExpression(t.assignmentExpression(node.operator,
-              t.identifier(`__.styles._static["${node.left.name}"]`),
-              statics
-            ))
-          }
-
-          // view.styles["name"] = ...
-          function dynamicStyleStatement(node, dynamics) {
-            return viewExpression(styleAssign(node, dynamics))
-          }
-
-          function styleAssign(node, right) {
-            // TODO: check if already set in view
-            // parent.scope.hasBinding()
-
-            const name = node.left.name
-
-            return styleFlintAssignment(name,
-              styleFunction(right || node.right)
-            )
-
-            // view.styles.$h1 = ...
-            function styleFlintAssignment(name, right) {
-              const ident = `__.styles["${name}"]`
-
-              return t.assignmentExpression('=', t.identifier(ident), right)
-            }
-
-            // (_index) => {}
-            function styleFunction(inner) {
-              return t.functionExpression(null, [t.identifier('_index')],
-                t.blockStatement([ t.returnStatement(inner) ])
-              )
-            }
-          }
-
-          function viewExpression(node) {
-            return t.expressionStatement(node)
-          }
-
-          // non-styles
-
-
-          if (node.flintAssignState) return
+          if (node.flintAssignState || isStyle) return
 
           const isBasicAssign = node.operator === "=" || node.operator === "-=" || node.operator === "+=";
           if (!isBasicAssign) return
-
-          const isAlreadyStyle = node.left.type == 'Identifier' && node.left.name.indexOf('__.styles') == 0
-
-          if (isAlreadyStyle) {
-            // double-assign #18
-            // console.log(node.left.name, scope.hasOwnBinding(node.left.name))
-            // if (scope.hasBinding(node.left.name)) {
-            //   throw new Error(`Defined same style twice! ${node.left.name.name}`)
-            // }
-
-            return
-          }
 
           const isRender = hasObjWithProp(node, '__', 'render')
 
