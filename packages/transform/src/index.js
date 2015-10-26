@@ -113,6 +113,16 @@ export default function ({ Plugin, types: t }) {
         )
       },
 
+      TagExpression(node, parent, scope) {
+        let caller = 'Flint.tag'
+
+        if (scope.hasOwnBinding('__')) {
+          caller = 'this.tag'
+        }
+
+        return t.callExpression(t.identifier(caller), [t.literal(node.name.name), node.argument])
+      },
+
       JSXElement: {
         enter(node, parent, scope, file) {
           const el = node.openingElement
