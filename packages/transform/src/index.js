@@ -80,7 +80,7 @@ export default function createPlugin(options) {
   }
 
   // plugin
-  function FlintPlugin({ Plugin, types: t }) {
+  function FlintPlugin({ types: t }) {
 
     // plugin helpers
     function frozen(node) {
@@ -134,7 +134,7 @@ export default function createPlugin(options) {
     let inJSX = false
 
 
-    return new Plugin("flint-transform", {
+    return {
       visitor: {
         // Program: {
         //   exit(node, parent, scope, file) {
@@ -466,7 +466,7 @@ export default function createPlugin(options) {
           }
         }
       }
-    });
+    }
   }
 
   return FlintPlugin

@@ -17,15 +17,19 @@ for f in packages/*; do
   elif [ -d "$f/src" ]; then
     echo "running babel on $f"
 
-    node node_modules/babel/bin/babel "$f/src" --out-dir "$f/lib/compat" \
-      --stage 0 \
+    node node_modules/babel-cli/bin/babel "$f/src" --out-dir "$f/lib/compat" \
+      --presets babel-preset-react \
+      --presets babel-preset-es2015 \
+      --plugins syntax-async-functions \
       --loose all \
       --blacklist es6.tailCall \
       --optional runtime \
       --copy-files $1 &
 
-    node node_modules/babel/bin/babel "$f/src" --out-dir "$f/lib/modern" \
-      --stage 0 \
+    node node_modules/babel-cli/bin/babel "$f/src" --out-dir "$f/lib/modern" \
+      --presets babel-preset-react \
+      --presets babel-preset-es2015 \
+      --plugins syntax-async-functions \
       --loose all \
       --optional asyncToGenerator \
       --blacklist es6.tailCall \
