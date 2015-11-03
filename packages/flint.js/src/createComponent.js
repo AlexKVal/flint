@@ -8,6 +8,7 @@ import hotCache from './mixins/hotCache'
 import reportError from './lib/reportError'
 import runEvents from './lib/runEvents'
 import createElement from './tag/createElement'
+import scopedOn from './lib/scopedOn'
 
 const capitalize = str =>
   str[0].toUpperCase() + str.substring(1)
@@ -82,20 +83,15 @@ export default function createComponent(Flint, Internal, name, view, options = {
       getInitialState() {
         this.setPath()
 
-        let u = void 0
+        let u = null
 
         this.successfulRender = null
         this.firstRender = true
         this.styles = { _static: {} }
         this.events = { mount: u, unmount: u, update: u, props: u }
 
-        this.viewOn = (scope, name, cb) => {
-          // check if they defined their own scope
-          if (name && typeof name == 'string')
-            return on(scope, name, cb)
-          else
-            return on(this, scope, name)
-        }
+        // scope on() to view
+        this.viewOn = scopedOn(this)
 
         // cache Flint view render() (defined below)
         const flintRender = this.render
@@ -217,7 +213,12 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
       getWrapper(tags, props, numRenders) {
         const wrapperName = name.toLowerCase()
-        let tagProps = Object.assign({ isWrapper: true }, props)
+
+        let tagProps = Object.assign({
+          isWrapper: true,
+          ref: 'view'
+        }, props)
+
         return this.el(`${wrapperName}`, tagProps, ...tags)
       },
 
@@ -231,7 +232,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
           props = { yield: true }
         }
 
-        if (numRenders == 1) {
+        else if (numRenders == 1) {
           tags = this.renders[0].call(this)
 
           addWrapper = (
@@ -245,8 +246,14 @@ export default function createComponent(Flint, Internal, name, view, options = {
           }
         }
 
-        if (numRenders > 1) {
+        else if (numRenders > 1) {
           tags = this.renders.map(r => r.call(this))
+        }
+
+        // if $ = false, unwrap if possible
+        if (this.styles._static && this.styles._static.$ == false && tags.length == 1) {
+          addWrapper = false
+          tags = tags[0]
         }
 
         // top level tag returned false
@@ -255,7 +262,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
         const wrappedTags = addWrapper ?
           this.getWrapper(tags, props, numRenders) :
-          tags
+          React.cloneElement(tags, { ref: 'view' })
 
         const styled = resolveStyles(this, wrappedTags)
 
