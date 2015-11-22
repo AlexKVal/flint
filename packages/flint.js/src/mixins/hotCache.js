@@ -12,7 +12,7 @@ export default function hotCache({ Internal, options, name }) {
         return val
       }
 
-      const path = this.props.__flint.path
+      const path = this.context.__flint.path
 
       if (!Internal.getCache[path])
         Internal.getCache[path] = {}
@@ -26,7 +26,7 @@ export default function hotCache({ Internal, options, name }) {
       if (process.env.production)
         return val
 
-      const path = this.props.__flint.path
+      const path = this.context.__flint.path
       if (_Flint.inspectorRefreshing === path) return Internal.getCache[path][name]
       // file scoped stuff always updates
       if (options.unchanged && where == 'fromFile')

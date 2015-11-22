@@ -1,7 +1,7 @@
 import ReactDOMServer from 'react-dom/server'
 import React from 'react'
 import raf from 'raf'
-import Radium from 'radium'
+import Radium from 'flint-radium'
 
 import phash from './lib/phash'
 import log from './lib/log'
@@ -44,17 +44,20 @@ export default function createComponent(Flint, Internal, name, view, options = {
     return React.createClass({
 
       childContextTypes: {
-        path: React.PropTypes.string,
-        displayName: React.PropTypes.string
+        __flint: React.PropTypes.object,
       },
 
       contextTypes: {
-        path: React.PropTypes.string
+        __flint: React.PropTypes.object
       },
 
       getChildContext() {
+        console.log('proxy passing', this.context.__flint)
         return {
-          path: this.getPath()
+          __flint: Object.assign({}, this.context.__flint, {
+            path: this.getPath(),
+            onMount: this.onMount
+          })
         }
       },
 
@@ -68,7 +71,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       setPathKey() {
-        const flint = this.props.__flint
+        const flint = this.context.__flint
         const key = flint && flint.key || '00'
         const index = flint && flint.index || '00'
         const parentPath = this.context.path || ''
@@ -112,10 +115,6 @@ export default function createComponent(Flint, Internal, name, view, options = {
 
         let viewProps = Object.assign({}, this.props)
 
-        viewProps.__flint = viewProps.__flint || {}
-        viewProps.__flint.onMount = this.onMount
-        viewProps.__flint.path = this.getPath()
-
         return React.createElement(View, viewProps)
       }
     })
@@ -130,6 +129,26 @@ export default function createComponent(Flint, Internal, name, view, options = {
       el,
 
       mixins: [hotCache({ Internal, options, name })],
+
+      // get __flint internal stuff
+      contextTypes: {
+        __flint: React.PropTypes.object
+      },
+
+      childContextTypes: {
+        displayName: React.PropTypes.string, // this seems necessary, not sure why
+        __flint: React.PropTypes.object
+      },
+
+      getChildContext() {
+        let __flint = Object.assign({}, this.context.__flint, {
+          parentStyles: this.styles,
+          parentName: name,
+        })
+
+        console.log('setting child context', __flint)
+        return { __flint }
+      },
 
       // TODO: shouldComponentUpdate based on hot load for perf
       shouldComponentUpdate() {
@@ -155,12 +174,13 @@ export default function createComponent(Flint, Internal, name, view, options = {
       // LIFECYCLES
 
       getInitialState() {
-        const fprops = this.props.__flint
+        const path = this.context.path
 
-        Internal.getInitialStates[fprops ? fprops.path : 'Main'] = () => this.getInitialState()
+        Internal.getInitialStates[path || 'Main'] = () => this.getInitialState()
 
         let u = null
 
+        this.__flint = this.context.__flint
         this.state = {}
         this.queuedUpdate = false
         this.firstRender = true
@@ -240,7 +260,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
           Internal.firstRender = false
 
         if (!process.env.production) {
-          this.props.__flint.onMount(this)
+          this.context.__flint.onMount(this)
           this.setID()
         }
       },
@@ -262,7 +282,7 @@ export default function createComponent(Flint, Internal, name, view, options = {
       setID() {
         // set flintID for state inspect
         const node = ReactDOM.findDOMNode(this)
-        if (node) node.__flintID = this.props.__flint.path
+        if (node) node.__flintID = this.context.__flint.path
       },
 
       componentDidUpdate() {
@@ -359,7 +379,8 @@ export default function createComponent(Flint, Internal, name, view, options = {
             !tags.props
           )
 
-          if (!Array.isArray(tags) && tags.props && tags.props.__flint && tags.props.__flint.tagName != name.toLowerCase()) {
+          // wtf does this do !!
+          if (!Array.isArray(tags) && tags.props && tags.props.name != name.toLowerCase()) {
             addWrapper = true
             tags = [tags]
           }
@@ -396,32 +417,30 @@ export default function createComponent(Flint, Internal, name, view, options = {
       },
 
       getLastGoodRender() {
-        return Internal.lastWorkingRenders[pathWithoutProps(this.props.__flint.path)]
+        return Internal.lastWorkingRenders[pathWithoutProps(this.context.__flint.path)]
       },
 
       render() {
-        const self = this
-
-        self.isRendering = true
-        self.firstRender = false
+        this.isRendering = true
+        this.firstRender = false
 
         if (process.env.production)
-          return self.getRender()
+          return this.getRender()
         else {
-          clearTimeout(viewErrorDebouncers[self.props.__flint.path])
+          clearTimeout(viewErrorDebouncers[this.context.__flint.path])
         }
 
         // try render
         try {
-          const els = self.getRender()
-          self.lastRendered = els
+          const els = this.getRender()
+          this.lastRendered = els
           return els
         }
         catch(e) {
           Internal.caughtRuntimeErrors++
 
           // console warn, with debounce
-          viewErrorDebouncers[self.props.__flint.path] = setTimeout(() => {
+          // viewErrorDebouncers[this.context.__flint.path] = setTimeout(() => {
             console.groupCollapsed(`Render error in view ${name} (${e.message})`)
             console.warn(e.message)
 
@@ -431,11 +450,11 @@ export default function createComponent(Flint, Internal, name, view, options = {
               console.error(e)
 
             console.groupEnd()
-          }, 500)
+          // }, 500)
 
           reportError(e)
 
-          const lastRender = self.getLastGoodRender()
+          const lastRender = this.getLastGoodRender()
 
           try {
             let inner = <span>Error in view {name}</span>
