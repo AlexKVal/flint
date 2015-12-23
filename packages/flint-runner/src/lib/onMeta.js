@@ -1,5 +1,6 @@
 import bridge from '../bridge'
 import exec from './exec'
+import { flatten } from 'lodash'
 
 let meta = {}
 
@@ -28,20 +29,31 @@ bridge.on('editor', data => {
 
   if (type == 'view:state') {
     let dynamics = meta[view].dynamicStyles
+    //let vars = meta[view].vars
 
-    let getLine = (prop, style) => {
+    let getPosition = (prop, style) => {
       let vals = dynamics
         .filter(d => d.selector == prop && d.prop == style)
-        .map(({ line }) => line)
+        .map(({ position }) => position)
 
       return vals.length > 0 ? vals[0] : null
     }
 
-    let toEditor = data.styles.map(({ prop, values }) =>
-      Object.keys(values).map(style =>
-        ({ viewData, value: values[style], line: getLine(prop, style) })
-      )
-    )
+    // merge with info from babel
+    let mergeStyles = styles =>
+      flatten(styles.map(({ prop, values }) =>
+        Object.keys(values).map(style =>
+          ({ viewData, value: values[style], position: getPosition(prop, style) })
+        )
+      ))
+
+    let mergeVars = vars => {
+      []
+    }
+
+    let toEditor = () =>
+      mergeStyles(dynamics).concat(mergeVars([]))
+
     bridge.message('editor:view:state', {
       view: view,
       styles: toEditor

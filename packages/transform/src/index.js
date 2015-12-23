@@ -698,7 +698,7 @@ export default function createPlugin(options) {
                     meta[currentView].dynamicStyles.push({
                       selector: node.left.name.substr(1),
                       prop: n.key.name,
-                      line: n.loc.start.line
+                      position: n.loc.end
                     })
                   }
                   dynKeys[n.key.name] = nodeToStr(n.value)
