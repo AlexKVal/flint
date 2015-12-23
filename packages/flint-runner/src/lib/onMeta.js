@@ -27,9 +27,8 @@ bridge.on('editor', data => {
   }
 
   if (type == 'view:state') {
-    console.log('view state', data.styles, )
     let dynamics = meta[view].dynamicStyles
-    let convert =
+
     let getLine = (prop, style) => {
       let vals = dynamics
         .filter(d => d.selector == prop && d.prop == style)
@@ -40,7 +39,7 @@ bridge.on('editor', data => {
 
     let toEditor = data.styles.map(({ prop, values }) =>
       Object.keys(values).map(style =>
-        ({ value: values[style], line: getLine(prop, style) })
+        ({ viewData, value: values[style], line: getLine(prop, style) })
       )
     )
     bridge.message('editor:view:state', {
