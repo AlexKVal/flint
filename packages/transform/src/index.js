@@ -281,8 +281,10 @@ export default function createPlugin(options) {
             const fullName = name + (subName ? `.${subName}` : '')
 
             currentView = fullName
+
             meta[currentView] = {
               data: { file: file.opts.filename },
+              dynamicStyles: [],
               styles: {},
               els: {},
             }
@@ -445,7 +447,8 @@ export default function createPlugin(options) {
 
               let arr = [t.literal(name), t.literal(key)]
 
-              meta[currentView].els[name + key] = el.loc.end
+              if (currentView)
+                meta[currentView].els[name + key] = el.loc.end
 
               // safer, checks for file scope or view scope only
               if ((scope.hasOwnBinding(name) || file.scope.hasOwnBinding(name)) && isUpperCase(name))
@@ -690,10 +693,19 @@ export default function createPlugin(options) {
                 const dynKeys = viewDynamicStyleKeys
 
                 statics.forEach(n => statKeys[n.key.name] = nodeToStr(n.value))
-                dynamics.forEach(n => dynKeys[n.key.name] = nodeToStr(n.value))
+                dynamics.forEach(n => {
+                  if (currentView) {
+                    meta[currentView].dynamicStyles.push({
+                      selector: node.left.name.substr(1),
+                      prop: n.key.name,
+                      line: n.loc.start.line
+                    })
+                  }
+                  dynKeys[n.key.name] = nodeToStr(n.value)
+                })
 
-                let hasStatics = statics.length
-                let hasDynamics = dynamics.length
+                let hasStatics = statics.length > 0
+                let hasDynamics = dynamics.length > 0
 
                 let result = []
 

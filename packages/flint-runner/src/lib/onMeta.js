@@ -5,8 +5,11 @@ let meta = {}
 
 bridge.on('editor', data => {
   let { type, key, el, view } = data
+  console.log('type', type, 'view', view)
 
-  if (type.substr(0, 6) != 'focus:') return
+  // start with one of these two
+  let start = type.split(':')[0]
+  if (start != 'focus' && start != 'view') return
 
   if (view === undefined) return
   // the browser turns One.Two into One-Two
@@ -20,6 +23,37 @@ bridge.on('editor', data => {
     bridge.message('editor:style', {
       view: viewData,
       position: meta[view].styles[el]
+    }, 'focus')
+  }
+
+  if (type == 'view:state') {
+    console.log('view state', data.styles, )
+    let dynamics = meta[view].dynamicStyles
+    let convert =
+    let getLine = (prop, style) => {
+      let vals = dynamics
+        .filter(d => d.selector == prop && d.prop == style)
+        .map(({ line }) => line)
+
+      return vals.length > 0 ? vals[0] : null
+    }
+
+    let toEditor = data.styles.map(({ prop, values }) =>
+      Object.keys(values).map(style =>
+        ({ value: values[style], line: getLine(prop, style) })
+      )
+    )
+    bridge.message('editor:view:state', {
+      view: view,
+      styles: toEditor
+    }, 'view')
+  }
+
+  if (type == 'focus:view') {
+    bridge.message('editor:style', {
+      view: viewData,
+      styles: meta[view].dynamicStyles,
+      values: [{ selector: 'h1', padding: 50 }, { selector: 'h1', fontSize: 10 }],
     }, 'focus')
   }
 
