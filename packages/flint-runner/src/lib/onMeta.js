@@ -40,23 +40,27 @@ bridge.on('editor', data => {
     }
 
     // merge with info from babel
-    let mergeStyles = styles =>
-      flatten(styles.map(({ prop, values }) =>
+    let mergeStyles = xs =>
+      flatten(xs.map(({ prop, values }) =>
         Object.keys(values).map(style =>
           ({ viewData, value: values[style], position: getPosition(prop, style) })
         )
       ))
 
     let mergeVars = vars => {
-      []
+      return []
     }
 
-    let toEditor = () =>
-      mergeStyles(dynamics).concat(mergeVars([]))
+    let toEditor = () => mergeStyles(data.styles).concat(mergeVars([]))
+
+    console.log('sending', {
+      view: view,
+      values: toEditor(),
+    })
 
     bridge.message('editor:view:state', {
       view: view,
-      styles: toEditor
+      values: toEditor()
     }, 'view')
   }
 
